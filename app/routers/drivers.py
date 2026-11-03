@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.services.credit_service import CreditService
+from app.models.credit import Driver
+from app.services.credit_service import CreditService, get_or_create_driver
 from app.schemas.credit import (
+    DriverCreateRequest,
+    DriverResponse,
     DriverBalanceResponse,
     DriverHistoryResponse,
     RedeemRequest,
@@ -10,6 +13,36 @@ from app.schemas.credit import (
 )
 
 router = APIRouter(prefix="/drivers", tags=["Drivers"])
+
+
+@router.post(
+    "/",
+    response_model=DriverResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create or register a driver",
+)
+def create_driver(
+    payload: DriverCreateRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Registers a new driver. Idempotent: returns existing driver if already registered.
+    """
+    existing = db.query(Driver).filter(Driver.id == payload.driver_id).first()
+    if existing:
+        return DriverResponse(
+            id=existing.id,
+            created_at=existing.created_at,
+            message="Driver already registered.",
+        )
+    driver = get_or_create_driver(db, payload.driver_id)
+    db.commit()
+    db.refresh(driver)
+    return DriverResponse(
+        id=driver.id,
+        created_at=driver.created_at,
+        message="Driver created successfully.",
+    )
 
 
 @router.get(

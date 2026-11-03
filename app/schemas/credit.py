@@ -36,6 +36,18 @@ class RideCancelledResponse(BaseModel):
 
 
 # --- Driver Schemas ---
+class DriverCreateRequest(BaseModel):
+    driver_id: str = Field(..., description="Unique ID for the driver")
+
+
+class DriverResponse(BaseModel):
+    id: str
+    created_at: datetime
+    message: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class DriverBalanceResponse(BaseModel):
     driver_id: str
     unexpired_balance: Decimal
