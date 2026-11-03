@@ -154,6 +154,39 @@ def test_cancelled_ride_reversal():
     assert "refund" in hist[1]["reason"].lower()
 
 
+def test_out_of_order_cancellation_tombstoning():
+    """Tombstoning: cancellation arrives before completion event."""
+    ride_id = "ride-out-of-order-999"
+    driver_id = "driver-Tombstone"
+
+    # Step 1: Cancellation arrives first
+    cancel_res = client.post("/rides/cancelled", json={
+        "ride_id": ride_id,
+        "reason": "Cancelled by user before completion event arrived",
+    })
+    assert cancel_res.status_code == 200
+    assert "tombstone" in cancel_res.json()["message"].lower()
+
+    # Step 2: Completion arrives later
+    complete_res = client.post("/rides/completed", json={
+        "ride_id": ride_id,
+        "driver_id": driver_id,
+        "vehicle_type": "electric",
+        "distance_km": 80.0,
+        "completed_at": "2026-11-03T20:00:00Z",
+    })
+    assert complete_res.status_code == 201
+    # Must award 0 credits because the ride was tombstoned!
+    assert float(complete_res.json()["credits_earned"]) == 0.0
+    assert "cancelled" in complete_res.json()["message"].lower()
+
+    # Step 3: Driver balance must be 0 and history empty of earned credits
+    bal = client.get(f"/drivers/{driver_id}/balance").json()
+    assert float(bal["unexpired_balance"]) == 0.0
+    hist = client.get(f"/drivers/{driver_id}/history").json()["history"]
+    assert len(hist) == 0
+
+
 def test_expired_credits_not_in_balance_and_fifo_redemption():
     """Requirement 6: Credits expire 12 months after completed_at. Oldest credits used first."""
     client.post("/rides/completed", json={

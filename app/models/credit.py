@@ -25,11 +25,12 @@ class Ride(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     ride_id = Column(String(100), unique=True, nullable=False, index=True)
-    driver_id = Column(String(100), nullable=False, index=True)
-    vehicle_type = Column(String(50), nullable=False)
-    distance_km = Column(Numeric(10, 4), nullable=False)
-    completed_at = Column(DateTime(timezone=True), nullable=False)
+    driver_id = Column(String(100), nullable=True, index=True)  # nullable for pre-cancellation tombstone
+    vehicle_type = Column(String(50), nullable=True)            # nullable until completion details arrive
+    distance_km = Column(Numeric(10, 4), nullable=True)         # nullable until completion details arrive
+    completed_at = Column(DateTime(timezone=True), nullable=True) # nullable until completion details arrive
     is_cancelled = Column(Integer, default=0, nullable=False)  # 0: active, 1: cancelled
+    cancellation_reason = Column(String(255), nullable=True)   # reason if cancelled
     created_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

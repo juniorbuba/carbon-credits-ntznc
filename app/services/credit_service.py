@@ -86,8 +86,26 @@ def compute_driver_unexpired_balance(db: Session, driver_id: str, as_of: datetim
 class CreditService:
     @staticmethod
     def process_completed_ride(db: Session, data: RideCompletedRequest) -> RideCompletedResponse:
+        # Check idempotency or pre-cancellation tombstone
         existing_ride = db.query(Ride).filter(Ride.ride_id == data.ride_id).first()
         if existing_ride:
+            # If the ride was tombstoned (cancelled before completion arrived):
+            if existing_ride.is_cancelled:
+                # Update ride details for audit record, but award ZERO credits
+                existing_ride.driver_id = data.driver_id
+                existing_ride.vehicle_type = data.vehicle_type
+                existing_ride.distance_km = data.distance_km
+                existing_ride.completed_at = data.completed_at
+                db.commit()
+                return RideCompletedResponse(
+                    ride_id=data.ride_id,
+                    driver_id=data.driver_id,
+                    credits_earned=Decimal("0.0000"),
+                    is_duplicate=True,
+                    message="Ride was previously cancelled (tombstoned). Zero credits awarded.",
+                )
+
+            # Normal duplicate ride: return existing calculation
             lot = db.query(CreditLot).filter(CreditLot.ride_id == data.ride_id).first()
             earned = lot.initial_amount if lot else Decimal("0.0000")
             return RideCompletedResponse(
@@ -273,14 +291,26 @@ class CreditService:
         """
         ride = db.query(Ride).filter(Ride.ride_id == data.ride_id).first()
         if not ride:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Ride {data.ride_id} not found.",
+            # Tombstoning: cancellation arrived before completion event.
+            # Record a tombstone so when completion arrives later, zero credits will be awarded.
+            tombstone_ride = Ride(
+                ride_id=data.ride_id,
+                is_cancelled=1,
+                cancellation_reason=data.reason,
+            )
+            db.add(tombstone_ride)
+            db.commit()
+            return RideCancelledResponse(
+                ride_id=data.ride_id,
+                driver_id=None,
+                reversed_credits=Decimal("0.0000"),
+                new_balance=Decimal("0.0000"),
+                message="Cancellation received before completion. Ride has been tombstoned to prevent future credit awards.",
             )
 
         if ride.is_cancelled:
             # Already cancelled, return idempotent status
-            current_balance = compute_driver_unexpired_balance(db, ride.driver_id)
+            current_balance = compute_driver_unexpired_balance(db, ride.driver_id) if ride.driver_id else Decimal("0.0000")
             return RideCancelledResponse(
                 ride_id=ride.ride_id,
                 driver_id=ride.driver_id,

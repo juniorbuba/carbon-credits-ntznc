@@ -29,7 +29,7 @@ class RideCancelledRequest(BaseModel):
 
 class RideCancelledResponse(BaseModel):
     ride_id: str
-    driver_id: str
+    driver_id: Optional[str] = None
     reversed_credits: Decimal
     new_balance: Decimal
     message: str
