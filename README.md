@@ -78,9 +78,17 @@ Reverses credits for rides refunded or cancelled after completion.
 
 ## 3. Local Development
 
- Just run `docker compose up`
+```powershell
+docker compose up --build
+```
 
-### Run Test Suite
+### 2. Run Test Suite
+To run the tests inside the active container:
+```powershell
+docker compose exec api pytest -v
+```
+
+Or run locally on your host machine:
 ```powershell
 pytest -v
 ```
