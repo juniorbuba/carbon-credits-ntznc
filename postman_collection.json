@@ -1,0 +1,269 @@
+{
+  "info": {
+    "_postman_id": "a9b7e123-c456-4789-9abc-def012345678",
+    "name": "Carbon Credits API",
+    "description": "Postman collection covering all endpoints for the Carbon Credits Service (FastAPI + PostgreSQL).\nCovers completed rides, duplicate idempotency checks, balance inquiries, FIFO redemptions, cancellations, and audit history.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    {
+      "key": "driver_id",
+      "value": "driver_101",
+      "type": "string"
+    },
+    {
+      "key": "ride_id",
+      "value": "ride_ev_001",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Checks API server health and database connectivity."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Rides",
+      "item": [
+        {
+          "name": "1. Completed Ride (EV - Earns Credits)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ride_id\": \"{{ride_id}}\",\n  \"driver_id\": \"{{driver_id}}\",\n  \"vehicle_type\": \"electric\",\n  \"distance_km\": 50.0,\n  \"completed_at\": \"2026-11-03T10:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/rides/completed",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rides",
+                "completed"
+              ]
+            },
+            "description": "Calculates and awards credits (50 km * 0.12 = 6.0 credits). Sets expiration to 12 months after completed_at."
+          },
+          "response": []
+        },
+        {
+          "name": "2. Completed Ride (Duplicate Idempotency Check)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ride_id\": \"{{ride_id}}\",\n  \"driver_id\": \"{{driver_id}}\",\n  \"vehicle_type\": \"electric\",\n  \"distance_km\": 50.0,\n  \"completed_at\": \"2026-11-03T10:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/rides/completed",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rides",
+                "completed"
+              ]
+            },
+            "description": "Sends the exact same ride_id again. Should return is_duplicate: true and NOT award extra credits."
+          },
+          "response": []
+        },
+        {
+          "name": "3. Completed Ride (Non-EV - 0 Credits)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ride_id\": \"ride_gas_002\",\n  \"driver_id\": \"{{driver_id}}\",\n  \"vehicle_type\": \"gasoline\",\n  \"distance_km\": 30.0,\n  \"completed_at\": \"2026-11-03T11:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/rides/completed",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rides",
+                "completed"
+              ]
+            },
+            "description": "A non-EV ride awards 0 credits."
+          },
+          "response": []
+        },
+        {
+          "name": "4. Cancelled Ride (Reverse Credits)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ride_id\": \"{{ride_id}}\",\n  \"reason\": \"Customer requested full fare refund\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/rides/cancelled",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rides",
+                "cancelled"
+              ]
+            },
+            "description": "Reverses credits previously earned from ride_id. Original earn entry remains in history with a matching reversal entry."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Drivers",
+      "item": [
+        {
+          "name": "0. Create Driver",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driver_id\": \"{{driver_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/drivers/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "drivers",
+                ""
+              ]
+            },
+            "description": "Explicitly registers a new driver."
+          },
+          "response": []
+        },
+        {
+          "name": "1. Get Driver Balance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/drivers/{{driver_id}}/balance",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "drivers",
+                "{{driver_id}}",
+                "balance"
+              ]
+            },
+            "description": "Returns current unexpired spendable balance along with total earned, redeemed, reversed, and expired credit totals."
+          },
+          "response": []
+        },
+        {
+          "name": "2. Redeem Credits (FIFO)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 2.5,\n  \"reason\": \"EV charging station voucher\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/drivers/{{driver_id}}/redeem",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "drivers",
+                "{{driver_id}}",
+                "redeem"
+              ]
+            },
+            "description": "Spends credits in FIFO order using the oldest unexpired credits first. Protected with row-level locks against negative balances."
+          },
+          "response": []
+        },
+        {
+          "name": "3. Get Driver Audit History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/drivers/{{driver_id}}/history",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "drivers",
+                "{{driver_id}}",
+                "history"
+              ]
+            },
+            "description": "Returns chronological transaction history (EARN, REDEEM, REVERSAL) with reasons, reference IDs, and running balances."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

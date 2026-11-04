@@ -10,8 +10,7 @@ A FastAPI & PostgreSQL service for tracking, recording, and redeeming carbon cre
 1. **Vehicle Eligibility**: Only electric vehicles (`electric`, `ev`, `bev`, `phev`) earn carbon credits. Internal combustion engine (ICE) or hybrid vehicles emit baseline carbon and earn `0` credits.
 2. **Emissions Baseline**: Average passenger ICE vehicles emit roughly **120g CO₂ / km** (~0.120 kg CO₂ / km).
 3. **Credit Unit**: 1 credit unit represents 1 kg of avoided CO₂ emissions (allowing meaningful granularity for everyday rides).
-4. **Formula**:
-   $$\text{Credits} = \text{distance\_km} \times 0.12$$
+4. **Formula**: Credits = distance\_km x 0.12
    *Example: A 50 km electric ride earns $50 \times 0.12 = 6.0000$ carbon credits.*
 
 ---
@@ -38,7 +37,16 @@ Returns the driver's current **unexpired** spendable balance along with aggregat
 ### 3. `GET /drivers/{id}/history`
 Returns the chronological audit trail of all transactions (`EARN`, `REDEEM`, `REVERSAL`), timestamp, balance after, and detailed reasons.
 
-### 4. `POST /drivers/{id}/redeem`
+### 4. `POST /drivers/`
+Creates a new driver and save the record to the database while ensuring duplicate records are not saved.
+- **Payload**:
+  ```json
+  {
+    "driver_id": "driver-A"
+  }
+  ```
+
+### 5. `POST /drivers/{id}/redeem`
 Spends credits using **FIFO** (oldest unexpired credits first).
 - **Concurrency Protection**: Uses row-level database locking (`SELECT ... FOR UPDATE`) on the driver record, guaranteeing that simultaneous requests will never overdraw or drop the balance below zero.
 - **Payload**:
@@ -49,7 +57,7 @@ Spends credits using **FIFO** (oldest unexpired credits first).
   }
   ```
 
-### 5. `POST /rides/cancelled`
+### 6. `POST /rides/cancelled`
 Reverses credits for rides refunded or cancelled after completion.
 - Marks the credit lot invalid and writes a `REVERSAL` transaction to the audit ledger.
 - The original `EARN` entry remains intact in history.
@@ -61,7 +69,7 @@ Reverses credits for rides refunded or cancelled after completion.
   }
   ```
 
-### 6. Expiration & FIFO Rule
+### 7. Expiration & FIFO Rule
 - Credits expire **12 months** after the ride's `completed_at` timestamp.
 - Expired credits are automatically excluded from balance calculation and cannot be spent.
 - When redeeming, the oldest active credit lots are consumed first.
@@ -70,23 +78,9 @@ Reverses credits for rides refunded or cancelled after completion.
 
 ## 3. Local Development
 
-### 1. Start Database
-```powershell
-docker compose up -d
-```
+ Just run `docker compose up`
 
-### 2. Run Migrations
-```powershell
-alembic upgrade head
-```
-
-### 3. Start API
-```powershell
-fastapi dev app/main.py
-```
-Interactive API docs: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-
-### 4. Run Test Suite
+### Run Test Suite
 ```powershell
 pytest -v
 ```
